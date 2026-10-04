@@ -22,7 +22,7 @@ import { colores, radios } from '@/src/theme'
 import type { Captura } from '@/src/types'
 
 export default function MangaScreen() {
-  const { listo, acceso, mangaActivaId, cerrarManga } = useSesion()
+  const { listo, acceso, mangaActivaId, mangasCerradas, cerrarManga } = useSesion()
   const [capturas, setCapturas] = useState<Captura[]>([])
   const [fotos, setFotos] = useState<Record<string, string>>({})
   const [centimetros, setCentimetros] = useState('')
@@ -53,7 +53,8 @@ export default function MangaScreen() {
   }, [acceso, manga])
 
   if (!listo) return null
-  if (!acceso || !manga) return <Redirect href={acceso ? '/campeonato' : '/'} />
+  if (!acceso) return <Redirect href="/" />
+  if (!manga || mangasCerradas.includes(manga.id)) return <Redirect href="/campeonato" />
 
   const sesion = acceso
   const mangaActiva = manga

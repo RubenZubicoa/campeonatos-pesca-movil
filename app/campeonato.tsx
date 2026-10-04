@@ -3,7 +3,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { obtenerClasificacion, obtenerEscenario } from '@/src/api'
-import { Aviso, Boton, Chip, Kicker, Tarjeta, Texto, Titulo } from '@/src/components/ui'
+import { Logo } from '@/src/components/Logo'
+import { Aviso, Boton, Chip, Tarjeta, Texto, Titulo } from '@/src/components/ui'
 import { mangaEnCurso, rangoDeTurno, textoRango } from '@/src/fecha'
 import { useSesion } from '@/src/sesion'
 import { colores, radios } from '@/src/theme'
@@ -12,7 +13,7 @@ import type { Clasificacion, Escenario, MangaAcceso } from '@/src/types'
 type Seccion = 'mangas' | 'escenario' | 'clasificacion'
 
 export default function CampeonatoScreen() {
-  const { listo, acceso, mangaActivaId, recargar, salir, iniciarManga } = useSesion()
+  const { listo, acceso, mangaActivaId, mangasCerradas, recargar, salir, iniciarManga } = useSesion()
   const [seccion, setSeccion] = useState<Seccion>('mangas')
   const [escenario, setEscenario] = useState<Escenario>({ sectores: [], tramos: [] })
   const [clasificacion, setClasificacion] = useState<Clasificacion>({ mangas: [], final: [] })
@@ -47,9 +48,6 @@ export default function CampeonatoScreen() {
   if (!listo) return null
   if (!acceso) return <Redirect href="/" />
 
-  const mangaActiva = acceso.mangas.find((manga) => manga.id === mangaActivaId) ?? null
-  const siguiente = acceso.mangas.find(mangaEnCurso) ?? acceso.mangas[0] ?? null
-
   async function refrescar() {
     setRefrescando(true)
     try {
@@ -64,8 +62,12 @@ export default function CampeonatoScreen() {
   }
 
   async function empezar(manga: MangaAcceso) {
-    await iniciarManga(manga.id)
-    router.push('/manga')
+    try {
+      await iniciarManga(manga.id)
+      router.push('/manga')
+    } catch (causa: unknown) {
+      setError(causa instanceof Error ? causa.message : 'No se ha podido iniciar la manga.')
+    }
   }
 
   return (
@@ -75,7 +77,7 @@ export default function CampeonatoScreen() {
         refreshControl={<RefreshControl refreshing={refrescando} onRefresh={refrescar} tintColor={colores.oro} />}
       >
         <View style={estilos.cabecera}>
-          <Kicker>The Lake</Kicker>
+          <Logo tamano="compacto" />
           <Titulo estilo={estilos.titulo}>{acceso.campeonato.nombre}</Titulo>
           <Texto suave>
             {acceso.campeonato.fecha} · {acceso.campeonato.lugar}
@@ -85,14 +87,6 @@ export default function CampeonatoScreen() {
           </Texto>
         </View>
 
-        {mangaActiva && (
-          <Tarjeta estilo={estilos.banner}>
-            <Kicker>Manga en curso</Kicker>
-            <Texto>{mangaActiva.nombre}</Texto>
-            <Boton titulo="Seguir registrando capturas" onPress={() => router.push('/manga')} />
-          </Tarjeta>
-        )}
-
         <View style={estilos.chips}>
           <Chip titulo="Mangas" activo={seccion === 'mangas'} onPress={() => setSeccion('mangas')} />
           <Chip titulo="Escenario" activo={seccion === 'escenario'} onPress={() => setSeccion('escenario')} />
@@ -101,16 +95,20 @@ export default function CampeonatoScreen() {
 
         <Aviso>{error}</Aviso>
 
-        {seccion === 'mangas' && <ListaMangas mangas={acceso.mangas} onIniciar={empezar} />}
+        {seccion === 'mangas' && (
+          <ListaMangas
+            mangas={acceso.mangas}
+            mangaActivaId={mangaActivaId}
+            mangasCerradas={mangasCerradas}
+            onIniciar={empezar}
+          />
+        )}
         {seccion === 'escenario' && <VistaEscenario escenario={escenario} mangas={acceso.mangas} />}
         {seccion === 'clasificacion' && (
           <VistaClasificacion clasificacion={clasificacion} participanteId={acceso.participante.id} />
         )}
 
         <View style={estilos.acciones}>
-          {siguiente && !mangaActiva && (
-            <Boton titulo={acceso.mangas.length === 1 ? 'Iniciar manga' : `Iniciar ${siguiente.nombre}`} onPress={() => empezar(siguiente)} />
-          )}
           <Boton titulo="Cambiar de identificador" variante="secundario" onPress={() => void salir()} />
         </View>
       </ScrollView>
@@ -120,9 +118,13 @@ export default function CampeonatoScreen() {
 
 function ListaMangas({
   mangas,
+  mangaActivaId,
+  mangasCerradas,
   onIniciar,
 }: {
   mangas: MangaAcceso[]
+  mangaActivaId: string | null
+  mangasCerradas: string[]
   onIniciar: (manga: MangaAcceso) => void
 }) {
   if (mangas.length === 0) {
@@ -137,12 +139,18 @@ function ListaMangas({
     <View style={estilos.lista}>
       {mangas.map((manga) => {
         const rango = rangoDeTurno(manga)
-        const enCurso = mangaEnCurso(manga)
+        const cerrada = mangasCerradas.includes(manga.id)
+        const activa = mangaActivaId === manga.id
+        const enHorario = !cerrada && mangaEnCurso(manga)
         return (
           <Tarjeta key={manga.id}>
             <View style={estilos.filaTitulo}>
               <Text style={estilos.nombreBloque}>{manga.nombre}</Text>
-              {enCurso && <Text style={estilos.etiqueta}>En curso</Text>}
+              {cerrada ? (
+                <Text style={[estilos.etiqueta, estilos.etiquetaCerrada]}>Cerrada</Text>
+              ) : enHorario ? (
+                <Text style={estilos.etiqueta}>En curso</Text>
+              ) : null}
             </View>
             <Texto suave>
               Turno {manga.asignacion.turno} · {rango ? textoRango(rango.inicio, rango.fin) : 'Sin horario'}
@@ -150,7 +158,13 @@ function ListaMangas({
             <Texto>
               {manga.asignacion.sector ?? 'Sector'} · {manga.asignacion.tramo ?? 'Tramo'}
             </Texto>
-            <Boton titulo="Iniciar manga" onPress={() => onIniciar(manga)} />
+            {cerrada ? (
+              <Texto suave>Esta manga ya está cerrada y no se puede volver a abrir.</Texto>
+            ) : activa ? (
+              <Boton titulo="Seguir registrando capturas" onPress={() => router.push('/manga')} />
+            ) : (
+              <Boton titulo="Iniciar manga" onPress={() => onIniciar(manga)} />
+            )}
           </Tarjeta>
         )
       })}
@@ -310,6 +324,10 @@ const estilos = StyleSheet.create({
     fontSize: 11,
     textTransform: 'uppercase',
   },
+  etiquetaCerrada: {
+    color: colores.texto,
+    backgroundColor: 'rgba(224, 122, 95, 0.35)',
+  },
   tramo: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -342,10 +360,6 @@ const estilos = StyleSheet.create({
     fontSize: 28,
     width: 36,
     textAlign: 'center',
-  },
-  banner: {
-    borderColor: colores.lineaFuerte,
-    gap: 12,
   },
   acciones: {
     gap: 10,

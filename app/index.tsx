@@ -2,7 +2,8 @@ import { Redirect, router } from 'expo-router'
 import { useState } from 'react'
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Aviso, Boton, Campo, Kicker, Texto, Titulo } from '@/src/components/ui'
+import { Logo } from '@/src/components/Logo'
+import { Aviso, Boton, Campo, Texto, Titulo } from '@/src/components/ui'
 import { useSesion } from '@/src/sesion'
 import { colores } from '@/src/theme'
 
@@ -27,8 +28,8 @@ export default function AccesoScreen() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={estilos.flex}>
         <ScrollView contentContainerStyle={estilos.contenido} keyboardShouldPersistTaps="handled">
           <View style={estilos.marca}>
-            <Kicker>The Lake</Kicker>
-            <Titulo>Campeonatos</Titulo>
+            <Logo estilo={{ alignSelf: 'center' }} />
+            <Titulo estilo={estilos.titulo}>Campeonatos</Titulo>
             <Texto estilo={estilos.lead}>
               Introduce el identificador que te ha dado la organización. Con él entras al campeonato en el que estás inscrito.
             </Texto>
@@ -71,8 +72,13 @@ const estilos = StyleSheet.create({
   marca: {
     gap: 10,
     marginBottom: 8,
+    alignItems: 'center',
+  },
+  titulo: {
+    textAlign: 'center',
   },
   lead: {
     marginTop: 4,
+    textAlign: 'center',
   },
 })
